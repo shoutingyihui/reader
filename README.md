@@ -53,8 +53,9 @@ npm run dev
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `PORT` | API 端口 | 8787 |
-| `ALLOWED_HOSTS` | 允许解析的文章域名 | `mp.weixin.qq.com` |
-| `IMAGE_HOSTS` | 允许代理的图片域名 | `mmbiz.qpic.cn,mmbiz.qlogo.cn` |
+| `ALLOWED_HOSTS` | 允许解析的文章域名（必须在默认白名单内） | `mp.weixin.qq.com` |
+| `CORS_ORIGINS` | 允许访问 API 的前端来源 | `http://localhost:5173` |
+| `IMAGE_HOSTS` | 允许代理的图片域名（必须在默认白名单内） | `mmbiz.qpic.cn,mmbiz.qlogo.cn` |
 | `CACHE_TTL_MS` | 缓存 TTL | 1800000 |
 | `CACHE_MAX_ENTRIES` | 缓存最大条数 | 100 |
 
@@ -78,6 +79,6 @@ npm run lint
 
 ## 已知限制
 
-- 目前仅支持 `mp.weixin.qq.com` 的文章解析。
+- 目前仅支持 `mp.weixin.qq.com/s` 的文章解析。
 - 未实现账号体系与多端同步（计划功能）。
 - 内容解析依赖公开页面结构，若页面结构调整需同步更新解析逻辑。

@@ -15,19 +15,24 @@ const parseList = (value) =>
         .filter(Boolean)
     : []
 
+const restrictAllowlist = (input, defaults) => {
+  const filtered = input.filter((item) => defaults.includes(item))
+  return filtered.length ? filtered : defaults
+}
+
 const allowedHosts = parseList(process.env.ALLOWED_HOSTS)
 const imageHosts = parseList(process.env.IMAGE_HOSTS)
 const allowedOrigins = parseList(process.env.CORS_ORIGINS)
 
-const hostAllowlist = allowedHosts.length ? allowedHosts : DEFAULT_ALLOWED_HOSTS
-const imageAllowlist = imageHosts.length ? imageHosts : DEFAULT_IMAGE_HOSTS
+const hostAllowlist = restrictAllowlist(allowedHosts, DEFAULT_ALLOWED_HOSTS)
+const imageAllowlist = restrictAllowlist(imageHosts, DEFAULT_IMAGE_HOSTS)
 const originAllowlist = allowedOrigins.length ? allowedOrigins : DEFAULT_ALLOWED_ORIGINS
 
 const app = express()
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, false)
+      if (!origin) return callback(null, true)
       return callback(null, originAllowlist.includes(origin))
     },
     methods: ['GET', 'POST'],
@@ -44,17 +49,12 @@ app.use((req, res, next) => {
   next()
 })
 
-const normalizeUrl = (value) => {
-  const url = new URL(value)
-  url.hash = ''
-  return url.toString()
-}
-
-const isAllowedHost = (url, allowlist) => {
-  const parsed = new URL(url)
+const isAllowedHost = (parsed, allowlist) => {
   if (parsed.protocol !== 'https:') return false
   return allowlist.includes(parsed.hostname)
 }
+
+const isWeChatArticlePath = (pathname) => pathname === '/s' || pathname === '/s/'
 
 const fetchHtml = async (targetUrl) => {
   const controller = new AbortController()
@@ -91,25 +91,33 @@ app.post('/api/extract', async (req, res) => {
       return res.status(400).json({ error: '请提供文章链接' })
     }
 
-    let normalizedUrl
+    let parsedUrl
     try {
-      normalizedUrl = normalizeUrl(url.trim())
+      parsedUrl = new URL(url.trim())
+      parsedUrl.hash = ''
     } catch {
       return res.status(400).json({ error: '链接格式不正确' })
     }
 
-    if (!isAllowedHost(normalizedUrl, hostAllowlist)) {
+    if (!isAllowedHost(parsedUrl, hostAllowlist)) {
       return res.status(400).json({
         error: `仅支持以下来源：${hostAllowlist.join(', ')}`,
       })
     }
 
+    if (!isWeChatArticlePath(parsedUrl.pathname)) {
+      return res.status(400).json({ error: '当前仅支持公众号文章正文链接' })
+    }
+
+    const normalizedUrl = parsedUrl.toString()
     const cached = getCache(normalizedUrl)
     if (cached) {
       return res.json({ cached: true, ...cached })
     }
 
-    const html = await fetchHtml(new URL(normalizedUrl))
+    const safeUrl = new URL('/s', `https://${parsedUrl.hostname}`)
+    safeUrl.search = parsedUrl.search
+    const html = await fetchHtml(safeUrl)
     const article = extractArticle(html, normalizedUrl, {
       proxyPath: '/api/proxy?url=',
     })
@@ -128,19 +136,20 @@ app.get('/api/proxy', async (req, res) => {
     return res.status(400).json({ error: '缺少资源地址' })
   }
 
-  let normalized
+  let parsedUrl
   try {
-    normalized = new URL(url).toString()
+    parsedUrl = new URL(url)
   } catch {
     return res.status(400).json({ error: '资源地址无效' })
   }
 
-  if (!isAllowedHost(normalized, imageAllowlist)) {
+  if (!isAllowedHost(parsedUrl, imageAllowlist)) {
     return res.status(400).json({ error: '资源域名未被允许' })
   }
 
   try {
-    const response = await fetch(new URL(normalized).toString())
+    const safeUrl = new URL(`${parsedUrl.pathname}${parsedUrl.search}`, `https://${parsedUrl.hostname}`)
+    const response = await fetch(safeUrl.toString())
     if (!response.ok) {
       return res.status(response.status).json({ error: '资源获取失败' })
     }

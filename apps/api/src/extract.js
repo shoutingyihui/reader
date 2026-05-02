@@ -29,6 +29,13 @@ const ALLOWED_ATTRIBUTES = {
   '*': ['id'],
 }
 
+const WECHAT_SELECTORS = {
+  title: '#activity-name',
+  author: '#js_name',
+  publishTime: '#publish_time',
+  content: '#js_content',
+}
+
 const countWords = (text) => {
   const cjkMatches = text.match(/[\u4e00-\u9fff]/g) || []
   const latinWords = text
@@ -85,11 +92,11 @@ const extractArticle = (html, sourceUrl, options = {}) => {
   const { proxyPath = '/api/proxy?url=' } = options
   const $ = cheerio.load(html)
 
-  const title = $('#activity-name').text().trim() || $('title').text().trim()
-  const author = $('#js_name').text().trim() || $('.profile_nickname').text().trim()
-  const publishTime = $('#publish_time').text().trim()
+  const title = $(WECHAT_SELECTORS.title).text().trim() || $('title').text().trim()
+  const author = $(WECHAT_SELECTORS.author).text().trim() || $('.profile_nickname').text().trim()
+  const publishTime = $(WECHAT_SELECTORS.publishTime).text().trim()
 
-  const contentNode = $('#js_content')
+  const contentNode = $(WECHAT_SELECTORS.content)
   const rawContent = contentNode.length ? contentNode.html() : $('article').html()
 
   const sanitized = sanitizeContent(rawContent || '')
