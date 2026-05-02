@@ -4,7 +4,8 @@ const { extractArticle } = require('./extract')
 const { getCache, setCache } = require('./cache')
 
 const DEFAULT_ALLOWED_HOSTS = ['mp.weixin.qq.com']
-const DEFAULT_IMAGE_HOSTS = ['mmbiz.qpic.cn', 'mmbiz.qlogo.cn', 'mmbiz.qpic.cn', 'mmbiz.qpic.cn']
+const DEFAULT_IMAGE_HOSTS = ['mmbiz.qpic.cn', 'mmbiz.qlogo.cn']
+const DEFAULT_ALLOWED_ORIGINS = ['http://localhost:5173']
 
 const parseList = (value) =>
   value
@@ -16,12 +17,22 @@ const parseList = (value) =>
 
 const allowedHosts = parseList(process.env.ALLOWED_HOSTS)
 const imageHosts = parseList(process.env.IMAGE_HOSTS)
+const allowedOrigins = parseList(process.env.CORS_ORIGINS)
 
 const hostAllowlist = allowedHosts.length ? allowedHosts : DEFAULT_ALLOWED_HOSTS
 const imageAllowlist = imageHosts.length ? imageHosts : DEFAULT_IMAGE_HOSTS
+const originAllowlist = allowedOrigins.length ? allowedOrigins : DEFAULT_ALLOWED_ORIGINS
 
 const app = express()
-app.use(cors({ origin: true }))
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, false)
+      return callback(null, originAllowlist.includes(origin))
+    },
+    methods: ['GET', 'POST'],
+  }),
+)
 app.use(express.json({ limit: '1mb' }))
 
 app.use((req, res, next) => {
@@ -39,14 +50,18 @@ const normalizeUrl = (value) => {
   return url.toString()
 }
 
-const isAllowedHost = (url, allowlist) => allowlist.includes(new URL(url).hostname)
+const isAllowedHost = (url, allowlist) => {
+  const parsed = new URL(url)
+  if (parsed.protocol !== 'https:') return false
+  return allowlist.includes(parsed.hostname)
+}
 
-const fetchHtml = async (url) => {
+const fetchHtml = async (targetUrl) => {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 12_000)
 
   try {
-    const response = await fetch(url, {
+    const response = await fetch(targetUrl.toString(), {
       signal: controller.signal,
       headers: {
         'User-Agent':
@@ -94,7 +109,7 @@ app.post('/api/extract', async (req, res) => {
       return res.json({ cached: true, ...cached })
     }
 
-    const html = await fetchHtml(normalizedUrl)
+    const html = await fetchHtml(new URL(normalizedUrl))
     const article = extractArticle(html, normalizedUrl, {
       proxyPath: '/api/proxy?url=',
     })
@@ -125,7 +140,7 @@ app.get('/api/proxy', async (req, res) => {
   }
 
   try {
-    const response = await fetch(normalized)
+    const response = await fetch(new URL(normalized).toString())
     if (!response.ok) {
       return res.status(response.status).json({ error: '资源获取失败' })
     }

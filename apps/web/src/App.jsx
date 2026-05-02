@@ -85,7 +85,7 @@ function App() {
       if (!node.id) node.id = `section-${index}`
       items.push({
         id: node.id,
-        text: node.textContent || `段落 ${index + 1}`,
+        text: node.textContent || `标题 ${index + 1}`,
         level: node.tagName,
       })
     })
