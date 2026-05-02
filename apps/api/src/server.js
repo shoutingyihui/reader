@@ -147,23 +147,8 @@ app.get('/api/proxy', async (req, res) => {
     return res.status(400).json({ error: '资源域名未被允许' })
   }
 
-  try {
-    const safeUrl = new URL(`${parsedUrl.pathname}${parsedUrl.search}`, `https://${parsedUrl.hostname}`)
-    const response = await fetch(safeUrl.toString())
-    if (!response.ok) {
-      return res.status(response.status).json({ error: '资源获取失败' })
-    }
-
-    const contentType = response.headers.get('content-type')
-    if (contentType) res.set('Content-Type', contentType)
-    res.set('Cache-Control', 'public, max-age=86400')
-
-    const buffer = Buffer.from(await response.arrayBuffer())
-    return res.send(buffer)
-  } catch (error) {
-    console.error('proxy error', error)
-    return res.status(500).json({ error: '资源代理失败' })
-  }
+  const safeUrl = new URL(`${parsedUrl.pathname}${parsedUrl.search}`, `https://${parsedUrl.hostname}`)
+  return res.redirect(302, safeUrl.toString())
 })
 
 const port = Number.parseInt(process.env.PORT || '', 10) || 8787

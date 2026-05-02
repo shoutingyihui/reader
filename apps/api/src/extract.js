@@ -75,6 +75,7 @@ const rewriteContent = (html, sourceUrl, proxyPath = '') => {
     $img.removeAttr('data-src')
     $img.attr('loading', 'lazy')
     $img.attr('decoding', 'async')
+    $img.attr('referrerpolicy', 'no-referrer')
   })
 
   $('a').each((_, link) => {
